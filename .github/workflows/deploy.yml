@@ -1,43 +1,35 @@
 name: Deploy to Amazon ECR
 
-on:
+on: 
   push:
-    branches: [ main ]  # Make sure this matches your GitHub branch
+    branches: [ main ]  # Ensure this matches your branch name
 
 jobs:
-
-  build-and-push:
-    name: Build and Push Image
+  build:
+    name: Build and Push Image to Amazon ECR
     runs-on: ubuntu-latest
 
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Check out code
-      uses: actions/checkout@v4
+      - name: Set up AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
 
-    - name: Configure AWS credentials
-      uses: aws-actions/configure-aws-credentials@v1
-      with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
-        aws-region: us-east-1
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
 
-    - name: Login to Amazon ECR
-      id: login-ecr
-      uses: aws-actions/amazon-ecr-login@v1
+      - name: Build and tag the Docker image
+        run: |
+          docker build -t ${{ steps.login-ecr.outputs.registry }}/webapp-repo:latest -f Dockerfile .
+          docker tag ${{ steps.login-ecr.outputs.registry }}/webapp-repo:latest ${{ steps.login-ecr.outputs.registry }}/webapp-repo:latest
 
-    - name: Build, Tag, and Push Image to Amazon ECR
-      env:
-        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-        ECR_REPOSITORY: webapp-repo  # Change this if your repo name is different
-        IMAGE_TAG: latest
-      run: |
-        # Build Docker image
-        docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG -f Dockerfile.webapp .
-        
-        # Verify Docker images
-        docker images
-        
-        # Push the image to ECR
-        docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+      - name: Push image to Amazon ECR
+        run: |
+          docker push ${{ steps.login-ecr.outputs.registry }}/webapp-repo:latest
+
